@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>8-bit RPG Game Test</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      font-family: 'Courier New', monospace;
+      background-color: #1a1a2e;
+      color: #eee;
+      padding: 20px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    h1 {
+      color: #ff6b6b;
+      text-align: center;
+      text-shadow: 2px 2px #000;
+      font-size: 2.5em;
+    }
+    h2 {
+      color: #4ecdc4;
+      border-bottom: 2px solid #4ecdc4;
+      padding-bottom: 5px;
+    }
+    h3 {
+      color: #ffe66d;
+    }
+    .section {
+      background-color: #16213e;
+      border: 2px solid #4ecdc4;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 15px;
+    }
+    .card {
+      background-color: #0f3460;
+      border: 1px solid #4ecdc4;
+      border-radius: 5px;
+      padding: 15px;
+    }
+    .card h4 {
+      color: #ff6b6b;
+      margin-top: 0;
+    }
+    .stat {
+      display: flex;
+      justify-content: space-between;
+      padding: 3px 0;
+      border-bottom: 1px dotted #333;
+    }
+    .stat-name {
+      color: #ffe66d;
+    }
+    .stat-value {
+      color: #4ecdc4;
+      font-weight: bold;
+    }
+    .traits {
+      font-size: 0.9em;
+      color: #aaa;
+      margin-top: 10px;
+    }
+    .trait {
+      background-color: #1a1a2e;
+      padding: 3px 8px;
+      border-radius: 3px;
+      margin: 2px;
+      display: inline-block;
+    }
+    .weakness {
+      color: #ff6b6b;
+      font-style: italic;
+    }
+    select, input, button {
+      background-color: #0f3460;
+      color: #eee;
+      border: 1px solid #4ecdc4;
+      padding: 8px 12px;
+      border-radius: 4px;
+      font-family: inherit;
+      margin: 5px;
+    }
+    button {
+      cursor: pointer;
+      background-color: #4ecdc4;
+      color: #1a1a2e;
+      font-weight: bold;
+    }
+    button:hover {
+      background-color: #ffe66d;
+    }
+    .controls {
+      margin: 15px 0;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .result {
+      background-color: #1a1a2e;
+      border: 1px solid #ffe66d;
+      padding: 15px;
+      border-radius: 5px;
+      margin-top: 15px;
+    }
+    .character-sheet {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 600px) {
+      .character-sheet {
+        grid-template-columns: 1fr;
+      }
+    }
+    .log {
+      background-color: #0a0a15;
+      border: 1px solid #333;
+      padding: 10px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-size: 0.9em;
+    }
+    .log-entry {
+      padding: 3px 0;
+      border-bottom: 1px solid #222;
+    }
+    .log-damage {
+      color: #ff6b6b;
+    }
+    .log-heal {
+      color: #4ecdc4;
+    }
+    .log-info {
+      color: #ffe66d;
+    }
+    .hp-bar, .mp-bar {
+      height: 20px;
+      border-radius: 3px;
+      margin: 5px 0;
+      position: relative;
+    }
+    .hp-bar {
+      background-color: #330000;
+    }
+    .mp-bar {
+      background-color: #000033;
+    }
+    .hp-fill {
+      background: linear-gradient(90deg, #ff0000, #ff6b6b);
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .mp-fill {
+      background: linear-gradient(90deg, #0000ff, #6b6bff);
+      height: 100%;
+      border-radius: 3px;
+      transition: width 0.3s;
+    }
+    .bar-text {
+      position: absolute;
+      width: 100%;
+      text-align: center;
+      line-height: 20px;
+      font-size: 0.8em;
+      text-shadow: 1px 1px #000;
+    }
+  </style>
+</head>
+<body>
+  <h1>8-bit RPG Game Test</h1>
+
+  <!-- Races Section -->
+  <div class="section">
+    <h2>Races</h2>
+    <div class="grid" id="races-grid"></div>
+  </div>
+
+  <!-- Classes Section -->
+  <div class="section">
+    <h2>Classes</h2>
+    <div class="grid" id="classes-grid"></div>
+  </div>
+
+  <!-- Character Creator -->
+  <div class="section">
+    <h2>Character Creator</h2>
+    <div class="controls">
+      <label>Name: <input type="text" id="char-name" value="Hero" /></label>
+      <label>Race: <select id="char-race"></select></label>
+      <label>Class: <select id="char-class"></select></label>
+      <label>Level: <input type="number" id="char-level" value="1" min="1" max="99" /></label>
+      <button onclick="createCharacter()">Create Character</button>
+    </div>
+    <div id="character-display"></div>
+  </div>
+
+  <!-- Formula Testing -->
+  <div class="section">
+    <h2>Formula Testing</h2>
+    <div class="controls">
+      <label>STR: <input type="number" id="test-str" value="20" min="0" max="255" /></label>
+      <label>AGI: <input type="number" id="test-agi" value="15" min="0" max="255" /></label>
+      <label>MAG: <input type="number" id="test-mag" value="10" min="0" max="255" /></label>
+      <label>DEF: <input type="number" id="test-def" value="10" min="0" max="255" /></label>
+      <label>CON: <input type="number" id="test-con" value="10" min="0" max="255" /></label>
+      <button onclick="testFormulas()">Calculate</button>
+    </div>
+    <div class="result" id="formula-results"></div>
+  </div>
+
+  <!-- Combat Simulation -->
+  <div class="section">
+    <h2>Combat Simulation</h2>
+    <div class="controls">
+      <label>Attacker STR: <input type="number" id="atk-str" value="30" min="0" max="255" /></label>
+      <label>Defender DEF: <input type="number" id="def-def" value="15" min="0" max="255" /></label>
+      <label>Weapon Power: <input type="number" id="weapon-power" value="50" min="0" max="255" /></label>
+      <button onclick="simulateCombat()">Simulate Attack</button>
+    </div>
+    <div class="log" id="combat-log"></div>
+  </div>
+
+  <!-- Leveling System -->
+  <div class="section">
+    <h2>Leveling System</h2>
+    <div class="controls">
+      <label>Current Level: <input type="number" id="level-current" value="1" min="1" max="98" /></label>
+      <label>EXP to Add: <input type="number" id="exp-add" value="100" min="0" /></label>
+      <button onclick="testLeveling()">Add Experience</button>
+    </div>
+    <div class="result" id="leveling-results"></div>
+  </div>
+
+  <!-- EXP Table -->
+  <div class="section">
+    <h2>EXP Table (First 20 Levels)</h2>
+    <div class="grid" id="exp-table"></div>
+  </div>
+
+  <script type="module">
+    import {
+      // Constants
+      MAX_STAT, MAX_HP, MAX_MP, ELEMENTS,
+      BASE_CRIT_CHANCE, WARRIOR_CRIT_CHANCE,
+
+      // Stats
+      calculateMaxHP, calculateMaxMP, createBaseStats, clampStat,
+      calculateFinalStats, calculateEquipmentStats, createEmptyResistances,
+
+      // Races
+      RACES, HumanRace, EsperRace, CyborgRace, FaeRace,
+      getRace, getAllowedClassesForRace, getRaceTraitDescriptions,
+      getRaceWeaknessDescription,
+
+      // Classes
+      CLASSES, WarriorClass, MageClass, DefenderClass, HealerClass, FreelancerClass,
+      getClass, getClassAbilityDescriptions, getClassRestrictionDescriptions,
+      calculateSpellSlots, calculateTomeSlots,
+
+      // Formulas
+      calculateMeleeDamage, calculateSpellDamage, calculateHealingOutput,
+      calculateDefenseReduction,
+
+      // Combat
+      calculateCritChance, calculateCritMultiplier, getDodgeChance,
+      calculateTurnOrder,
+
+      // Leveling
+      generateExpTable, getExpForLevel, addExperience, calculateStatGains,
+    } from './dist/core/index.js';
+
+    // Make functions available globally for onclick handlers
+    window.createCharacter = createCharacter;
+    window.testFormulas = testFormulas;
+    window.simulateCombat = simulateCombat;
+    window.testLeveling = testLeveling;
+
+    // Current character state
+    let currentCharacter = null;
+
+    // Initialize the page
+    function init() {
+      renderRaces();
+      renderClasses();
+      populateSelects();
+      renderExpTable();
+    }
+
+    // Render race cards
+    function renderRaces() {
+      const grid = document.getElementById('races-grid');
+      const raceNames = ['Human', 'Esper', 'Cyborg', 'Fae'];
+
+      grid.innerHTML = raceNames.map(name => {
+        const race = getRace(name);
+        const traits = getRaceTraitDescriptions(name);
+        const weakness = getRaceWeaknessDescription(name);
+
+        return `
+          <div class="card">
+            <h4>${race.name}</h4>
+            <div class="stat"><span class="stat-name">STR</span><span class="stat-value">${race.baseStats.STR}</span></div>
+            <div class="stat"><span class="stat-name">AGI</span><span class="stat-value">${race.baseStats.AGI}</span></div>
+            <div class="stat"><span class="stat-name">MAG</span><span class="stat-value">${race.baseStats.MAG}</span></div>
+            <div class="stat"><span class="stat-name">DEF</span><span class="stat-value">${race.baseStats.DEF}</span></div>
+            <div class="stat"><span class="stat-name">CON</span><span class="stat-value">${race.baseStats.CON}</span></div>
+            <div class="stat"><span class="stat-name">Classes</span><span class="stat-value">${race.allowedClasses.join(', ')}</span></div>
+            <div class="traits">
+              ${traits.map(t => `<span class="trait">${t}</span>`).join('')}
+            </div>
+            <p class="weakness">Weakness: ${weakness}</p>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Render class cards
+    function renderClasses() {
+      const grid = document.getElementById('classes-grid');
+      const classNames = ['Warrior', 'Mage', 'Defender', 'Healer', 'Freelancer'];
+
+      grid.innerHTML = classNames.map(name => {
+        const cls = getClass(name);
+        const abilities = getClassAbilityDescriptions(name);
+        const restrictions = getClassRestrictionDescriptions(name);
+
+        return `
+          <div class="card">
+            <h4>${cls.name}</h4>
+            <h5 style="color: #aaa; margin: 5px 0;">Base Stat Bonuses:</h5>
+            ${Object.entries(cls.baseStatBonus).map(([stat, val]) =>
+              `<div class="stat"><span class="stat-name">${stat}</span><span class="stat-value">+${val}</span></div>`
+            ).join('')}
+            <h5 style="color: #aaa; margin: 10px 0 5px;">Growth per Level:</h5>
+            ${Object.entries(cls.growth).map(([stat, val]) =>
+              `<div class="stat"><span class="stat-name">${stat}</span><span class="stat-value">+${val}</span></div>`
+            ).join('')}
+            <div class="traits">
+              <strong>Abilities:</strong><br>
+              ${abilities.map(a => `<span class="trait">${a}</span>`).join('')}
+            </div>
+            ${restrictions.length > 0 ? `
+              <div class="traits" style="color: #ff6b6b;">
+                <strong>Restrictions:</strong><br>
+                ${restrictions.map(r => `<span class="trait">${r}</span>`).join('')}
+              </div>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // Populate select dropdowns
+    function populateSelects() {
+      const raceSelect = document.getElementById('char-race');
+      const classSelect = document.getElementById('char-class');
+
+      raceSelect.innerHTML = ['Human', 'Esper', 'Cyborg', 'Fae']
+        .map(r => `<option value="${r}">${r}</option>`)
+        .join('');
+
+      raceSelect.addEventListener('change', updateClassOptions);
+      updateClassOptions();
+    }
+
+    // Update class options based on race
+    function updateClassOptions() {
+      const race = document.getElementById('char-race').value;
+      const classSelect = document.getElementById('char-class');
+      const allowedClasses = getAllowedClassesForRace(race);
+
+      classSelect.innerHTML = allowedClasses
+        .map(c => `<option value="${c}">${c}</option>`)
+        .join('');
+    }
+
+    // Create a character
+    function createCharacter() {
+      const name = document.getElementById('char-name').value || 'Hero';
+      const raceName = document.getElementById('char-race').value;
+      const className = document.getElementById('char-class').value;
+      const level = parseInt(document.getElementById('char-level').value) || 1;
+
+      const race = getRace(raceName);
+      const cls = getClass(className);
+
+      // Calculate base stats (race + class bonus + level growth)
+      const baseStats = createBaseStats(
+        race.baseStats.STR + (cls.baseStatBonus.STR || 0),
+        race.baseStats.AGI + (cls.baseStatBonus.AGI || 0),
+        race.baseStats.MAG + (cls.baseStatBonus.MAG || 0),
+        race.baseStats.DEF + (cls.baseStatBonus.DEF || 0),
+        race.baseStats.CON + (cls.baseStatBonus.CON || 0)
+      );
+
+      // Apply level growth
+      if (level > 1) {
+        const growthLevels = level - 1;
+        const raceGrowth = race.growth || { STR: 0, AGI: 0, MAG: 0, DEF: 0, CON: 0 };
+        baseStats.STR += Math.floor((raceGrowth.STR + cls.growth.STR) * growthLevels);
+        baseStats.AGI += Math.floor((raceGrowth.AGI + cls.growth.AGI) * growthLevels);
+        baseStats.MAG += Math.floor((raceGrowth.MAG + cls.growth.MAG) * growthLevels);
+        baseStats.DEF += Math.floor((raceGrowth.DEF + cls.growth.DEF) * growthLevels);
+        baseStats.CON += Math.floor((raceGrowth.CON + cls.growth.CON) * growthLevels);
+      }
+
+      // Clamp stats
+      for (const stat of Object.keys(baseStats)) {
+        baseStats[stat] = clampStat(baseStats[stat]);
+      }
+
+      currentCharacter = {
+        name,
+        race: raceName,
+        class: className,
+        level,
+        baseStats,
+        equipment: {
+          weapon: null,
+          secondWeapon: null,
+          shield: null,
+          secondShield: null,
+          armor: {}
+        },
+        currentHP: calculateMaxHP(baseStats.CON),
+        currentMP: calculateMaxMP(baseStats.MAG, raceName),
+        experience: 0,
+        spells: [],
+        items: []
+      };
+
+      renderCharacter();
+    }
+
+    // Render character sheet
+    function renderCharacter() {
+      if (!currentCharacter) return;
+
+      const display = document.getElementById('character-display');
+      const maxHP = calculateMaxHP(currentCharacter.baseStats.CON);
+      const maxMP = calculateMaxMP(currentCharacter.baseStats.MAG, currentCharacter.race);
+      const hpPercent = (currentCharacter.currentHP / maxHP) * 100;
+      const mpPercent = (currentCharacter.currentMP / maxMP) * 100;
+
+      const spellSlots = calculateSpellSlots(currentCharacter.class, currentCharacter.level);
+      const tomeSlots = calculateTomeSlots(currentCharacter.class, currentCharacter.level);
+
+      display.innerHTML = `
+        <div class="character-sheet">
+          <div class="card">
+            <h4>${currentCharacter.name}</h4>
+            <p>Level ${currentCharacter.level} ${currentCharacter.race} ${currentCharacter.class}</p>
+
+            <div class="hp-bar">
+              <div class="hp-fill" style="width: ${hpPercent}%"></div>
+              <span class="bar-text">HP: ${currentCharacter.currentHP} / ${maxHP}</span>
+            </div>
+            <div class="mp-bar">
+              <div class="mp-fill" style="width: ${mpPercent}%"></div>
+              <span class="bar-text">MP: ${currentCharacter.currentMP} / ${maxMP}</span>
+            </div>
+
+            <h5 style="color: #ffe66d; margin-top: 15px;">Stats</h5>
+            <div class="stat"><span class="stat-name">STR</span><span class="stat-value">${currentCharacter.baseStats.STR}</span></div>
+            <div class="stat"><span class="stat-name">AGI</span><span class="stat-value">${currentCharacter.baseStats.AGI}</span></div>
+            <div class="stat"><span class="stat-name">MAG</span><span class="stat-value">${currentCharacter.baseStats.MAG}</span></div>
+            <div class="stat"><span class="stat-name">DEF</span><span class="stat-value">${currentCharacter.baseStats.DEF}</span></div>
+            <div class="stat"><span class="stat-name">CON</span><span class="stat-value">${currentCharacter.baseStats.CON}</span></div>
+          </div>
+          <div class="card">
+            <h4>Combat Stats</h4>
+            <div class="stat"><span class="stat-name">Melee Damage</span><span class="stat-value">${calculateMeleeDamage(currentCharacter.baseStats.STR, 50, currentCharacter.class, currentCharacter.race)}</span></div>
+            <div class="stat"><span class="stat-name">Spell Damage</span><span class="stat-value">${calculateSpellDamage(currentCharacter.baseStats.MAG, 50, currentCharacter.class, currentCharacter.race)}</span></div>
+            <div class="stat"><span class="stat-name">Defense Reduction</span><span class="stat-value">${Math.round(calculateDefenseReduction(currentCharacter.baseStats.DEF) * 100)}%</span></div>
+            <div class="stat"><span class="stat-name">Crit Chance</span><span class="stat-value">${Math.round(calculateCritChance(currentCharacter.class, 'melee') * 100)}%</span></div>
+            <div class="stat"><span class="stat-name">Crit Multiplier</span><span class="stat-value">${calculateCritMultiplier(currentCharacter.class, currentCharacter.race, 'melee')}x</span></div>
+            <div class="stat"><span class="stat-name">Dodge Chance</span><span class="stat-value">${Math.round(getDodgeChance(currentCharacter.baseStats.AGI, currentCharacter.class) * 100)}%</span></div>
+
+            <h5 style="color: #ffe66d; margin-top: 15px;">Slots</h5>
+            <div class="stat"><span class="stat-name">Spell Slots</span><span class="stat-value">${spellSlots}</span></div>
+            <div class="stat"><span class="stat-name">Tome Slots</span><span class="stat-value">${tomeSlots}</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Test formulas
+    function testFormulas() {
+      const str = parseInt(document.getElementById('test-str').value) || 0;
+      const agi = parseInt(document.getElementById('test-agi').value) || 0;
+      const mag = parseInt(document.getElementById('test-mag').value) || 0;
+      const def = parseInt(document.getElementById('test-def').value) || 0;
+      const con = parseInt(document.getElementById('test-con').value) || 0;
+
+      const maxHP = calculateMaxHP(con);
+      const maxMPHuman = calculateMaxMP(mag, 'Human');
+      const maxMPCyborg = calculateMaxMP(mag, 'Cyborg');
+
+      const meleeDamage = calculateMeleeDamage(str, 50, 'Warrior', 'Human');
+      const spellDamage = calculateSpellDamage(mag, 50, 'Mage', 'Human');
+      const healAmount = calculateHealingOutput(mag, 50, 'Healer');
+      const defReduction = calculateDefenseReduction(def);
+
+      document.getElementById('formula-results').innerHTML = `
+        <h3>Results</h3>
+        <div class="grid">
+          <div>
+            <h4 style="color: #ff6b6b;">HP/MP</h4>
+            <div class="stat"><span class="stat-name">Max HP (CON ${con})</span><span class="stat-value">${maxHP}</span></div>
+            <div class="stat"><span class="stat-name">Max MP Human (MAG ${mag})</span><span class="stat-value">${maxMPHuman}</span></div>
+            <div class="stat"><span class="stat-name">Max MP Cyborg (MAG ${mag})</span><span class="stat-value">${maxMPCyborg}</span></div>
+          </div>
+          <div>
+            <h4 style="color: #4ecdc4;">Damage/Healing</h4>
+            <div class="stat"><span class="stat-name">Melee (STR ${str}, wpn 50)</span><span class="stat-value">${meleeDamage}</span></div>
+            <div class="stat"><span class="stat-name">Spell (MAG ${mag}, spell 50)</span><span class="stat-value">${spellDamage}</span></div>
+            <div class="stat"><span class="stat-name">Heal (MAG ${mag}, spell 50)</span><span class="stat-value">${healAmount}</span></div>
+          </div>
+          <div>
+            <h4 style="color: #ffe66d;">Defense</h4>
+            <div class="stat"><span class="stat-name">Damage Reduction</span><span class="stat-value">${Math.round(defReduction * 100)}%</span></div>
+            <div class="stat"><span class="stat-name">Damage Taken</span><span class="stat-value">${Math.round((1 - defReduction) * 100)}%</span></div>
+          </div>
+        </div>
+      `;
+    }
+
+    // Simulate combat
+    function simulateCombat() {
+      const atkStr = parseInt(document.getElementById('atk-str').value) || 0;
+      const defDef = parseInt(document.getElementById('def-def').value) || 0;
+      const weaponPower = parseInt(document.getElementById('weapon-power').value) || 0;
+
+      const log = document.getElementById('combat-log');
+      const entries = [];
+
+      // Simulate 10 attacks
+      for (let i = 0; i < 10; i++) {
+        const baseDamage = calculateMeleeDamage(atkStr, weaponPower, 'Warrior', 'Human');
+        const critChance = calculateCritChance('Warrior', 'melee');
+        const isCrit = Math.random() < critChance;
+        const critMult = isCrit ? calculateCritMultiplier('Warrior', 'Human', 'melee') : 1;
+        const defReduction = calculateDefenseReduction(defDef);
+
+        const rawDamage = Math.round(baseDamage * critMult);
+        const finalDamage = Math.round(rawDamage * (1 - defReduction));
+
+        entries.push(`
+          <div class="log-entry ${isCrit ? 'log-damage' : ''}">
+            Attack ${i + 1}: ${rawDamage} base${isCrit ? ' (CRIT!)' : ''} - ${Math.round(defReduction * 100)}% def = <strong>${finalDamage}</strong> damage
+          </div>
+        `);
+      }
+
+      log.innerHTML = entries.join('');
+    }
+
+    // Test leveling
+    function testLeveling() {
+      const currentLevel = parseInt(document.getElementById('level-current').value) || 1;
+      const expToAdd = parseInt(document.getElementById('exp-add').value) || 0;
+
+      const expTable = generateExpTable();
+      const currentExp = currentLevel > 1 ? expTable[currentLevel - 1] : 0;
+      const newExp = currentExp + expToAdd;
+
+      let newLevel = currentLevel;
+      for (let i = currentLevel; i < expTable.length; i++) {
+        if (newExp >= expTable[i]) {
+          newLevel = i + 1;
+        } else {
+          break;
+        }
+      }
+
+      const levelsGained = newLevel - currentLevel;
+      const expForNext = newLevel < 99 ? expTable[newLevel] : 'MAX';
+      const expProgress = newLevel < 99 ? newExp - (newLevel > 1 ? expTable[newLevel - 1] : 0) : 0;
+      const expNeeded = newLevel < 99 ? expTable[newLevel] - (newLevel > 1 ? expTable[newLevel - 1] : 0) : 0;
+
+      // Calculate stat gains for Warrior
+      const growth = { STR: 3, AGI: 3, MAG: 1, DEF: 1, CON: 1 };
+      const statGains = {
+        STR: Math.floor(growth.STR * levelsGained),
+        AGI: Math.floor(growth.AGI * levelsGained),
+        MAG: Math.floor(growth.MAG * levelsGained),
+        DEF: Math.floor(growth.DEF * levelsGained),
+        CON: Math.floor(growth.CON * levelsGained)
+      };
+
+      document.getElementById('leveling-results').innerHTML = `
+        <h3>Leveling Results</h3>
+        <div class="stat"><span class="stat-name">Starting Level</span><span class="stat-value">${currentLevel}</span></div>
+        <div class="stat"><span class="stat-name">EXP Added</span><span class="stat-value">+${expToAdd}</span></div>
+        <div class="stat"><span class="stat-name">Total EXP</span><span class="stat-value">${newExp}</span></div>
+        <div class="stat"><span class="stat-name">New Level</span><span class="stat-value">${newLevel}</span></div>
+        <div class="stat"><span class="stat-name">Levels Gained</span><span class="stat-value log-info">${levelsGained > 0 ? '+' + levelsGained : 0}</span></div>
+        <div class="stat"><span class="stat-name">EXP to Next</span><span class="stat-value">${expForNext}</span></div>
+        ${levelsGained > 0 ? `
+          <h4 style="color: #ffe66d; margin-top: 15px;">Stat Gains (Warrior)</h4>
+          <div class="stat"><span class="stat-name">STR</span><span class="stat-value">+${statGains.STR}</span></div>
+          <div class="stat"><span class="stat-name">AGI</span><span class="stat-value">+${statGains.AGI}</span></div>
+          <div class="stat"><span class="stat-name">MAG</span><span class="stat-value">+${statGains.MAG}</span></div>
+          <div class="stat"><span class="stat-name">DEF</span><span class="stat-value">+${statGains.DEF}</span></div>
+          <div class="stat"><span class="stat-name">CON</span><span class="stat-value">+${statGains.CON}</span></div>
+        ` : ''}
+      `;
+    }
+
+    // Render EXP table
+    function renderExpTable() {
+      const expTable = generateExpTable();
+      const grid = document.getElementById('exp-table');
+
+      let html = '';
+      for (let i = 0; i < 20; i++) {
+        const level = i + 1;
+        const expRequired = expTable[i];
+        const expToNext = i < 98 ? expTable[i + 1] - expTable[i] : '-';
+
+        html += `
+          <div class="card" style="padding: 10px;">
+            <div class="stat"><span class="stat-name">Level ${level}</span><span class="stat-value">${expRequired} EXP</span></div>
+            <div class="stat" style="font-size: 0.8em;"><span class="stat-name">To next</span><span class="stat-value">${expToNext}</span></div>
+          </div>
+        `;
+      }
+
+      grid.innerHTML = html;
+    }
+
+    // Initialize on load
+    init();
+  </script>
+</body>
+</html>
