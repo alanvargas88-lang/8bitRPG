@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runestone Chronicles - 8-bit RPG</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; image-rendering: pixelated; }
+        body { background: #0f0f23; display: flex; justify-content: center; align-items: center; min-height: 100vh; font-family: monospace; }
+        #game { width: 640px; height: 576px; background: #1a1a2e; border: 4px solid #16213e; position: relative; overflow: hidden; }
+        .screen { width: 100%; height: 100%; position: absolute; display: none; flex-direction: column; }
+        .screen.active { display: flex; }
+
+        /* Title Screen */
+        #title { background: linear-gradient(180deg, #0a0a1a 0%, #1a1a3e 50%, #0a0a1a 100%); justify-content: center; align-items: center; text-align: center; }
+        .logo { color: #ffd700; font-size: 32px; text-shadow: 2px 2px #8b4513, 4px 4px #000; }
+        .subtitle { color: #87ceeb; font-size: 16px; margin: 10px 0 50px; }
+        .menu-item { color: #fff; font-size: 18px; padding: 10px 30px; cursor: pointer; border: 2px solid transparent; margin: 5px; }
+        .menu-item:hover, .menu-item.sel { color: #ffd700; border-color: #ffd700; }
+
+        /* Character Creation */
+        #creation { background: #1a1a2e; padding: 20px; }
+        .step { display: none; flex-direction: column; align-items: center; }
+        .step.active { display: flex; }
+        .step-title { color: #ffd700; font-size: 24px; margin-bottom: 20px; }
+        .grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }
+        .card { background: #16213e; border: 2px solid #0f3460; padding: 15px; cursor: pointer; text-align: center; }
+        .card:hover, .card.sel { border-color: #ffd700; }
+        .card-name { color: #fff; font-size: 14px; margin-top: 8px; }
+        .card-desc { color: #888; font-size: 10px; margin-top: 4px; }
+        .sprite { width: 64px; height: 64px; margin: 0 auto; }
+        .sprite-sm { width: 32px; height: 32px; }
+        input.name { background: #16213e; border: 2px solid #0f3460; color: #fff; font-family: monospace; font-size: 20px; padding: 10px 20px; text-align: center; text-transform: uppercase; }
+        input.name:focus { outline: none; border-color: #ffd700; }
+        .btns { display: flex; gap: 15px; margin-top: 25px; }
+        .btn { background: #16213e; border: 2px solid #0f3460; color: #fff; font-family: monospace; font-size: 14px; padding: 8px 25px; cursor: pointer; }
+        .btn:hover { border-color: #ffd700; color: #ffd700; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        /* Town Screen */
+        #town { background: #2d5a27; }
+        .town-map { flex: 1; position: relative; background: linear-gradient(180deg, #3d7a37 0%, #2d5a27 100%); }
+        .building { position: absolute; cursor: pointer; transition: transform 0.1s; }
+        .building:hover { transform: scale(1.05); }
+        .building-label { position: absolute; bottom: -18px; left: 50%; transform: translateX(-50%); color: #fff; font-size: 9px; background: rgba(0,0,0,0.8); padding: 2px 5px; white-space: nowrap; }
+        .path { position: absolute; background: #8b7355; }
+        .path-h { height: 20px; }
+        .path-v { width: 20px; }
+        .exit-marker { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); width: 50px; height: 25px; background: #5a4a3a; border-top: 3px solid #ffd700; cursor: pointer; display: flex; justify-content: center; align-items: center; color: #ffd700; font-size: 10px; }
+        .info-panel { height: 100px; background: #16213e; border-top: 3px solid #0f3460; padding: 10px 15px; }
+        .info-title { color: #ffd700; font-size: 12px; margin-bottom: 5px; }
+        .info-text { color: #fff; font-size: 11px; line-height: 1.4; }
+        .info-hint { color: #666; font-size: 9px; margin-top: 8px; }
+
+        /* Building Interior */
+        #interior { background: #1a1a2e; }
+        .int-content { flex: 1; padding: 15px; overflow-y: auto; }
+        .int-header { color: #ffd700; font-size: 18px; text-align: center; margin-bottom: 15px; }
+        .npc-grid { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+        .npc { background: #16213e; border: 2px solid #0f3460; padding: 8px; cursor: pointer; text-align: center; width: 90px; }
+        .npc:hover { border-color: #ffd700; }
+        .npc-name { color: #fff; font-size: 10px; margin-top: 5px; }
+        .npc-class { color: #87ceeb; font-size: 9px; }
+        .dialog { height: 120px; background: #16213e; border-top: 3px solid #0f3460; padding: 12px 15px; }
+        .dialog-speaker { color: #ffd700; font-size: 12px; margin-bottom: 8px; }
+        .dialog-text { color: #fff; font-size: 11px; line-height: 1.5; }
+        .dialog-hint { position: absolute; bottom: 8px; right: 15px; color: #666; font-size: 9px; animation: blink 1s infinite; }
+        @keyframes blink { 0%,50%{opacity:1} 51%,100%{opacity:0} }
+        .back-btn { position: absolute; top: 8px; left: 8px; z-index: 10; }
+
+        /* School Interior */
+        .school-room { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; padding: 10px; }
+        .blackboard { grid-column: 1/-1; background: #1a3a1a; border: 6px solid #5a3a1a; padding: 15px; color: #fff; font-size: 12px; text-align: center; min-height: 80px; }
+        .desk { background: #5a4a3a; border: 2px solid #3a2a1a; padding: 10px; display: flex; justify-content: center; align-items: center; cursor: pointer; height: 50px; }
+        .desk:hover { background: #6a5a4a; }
+        .book { width: 20px; height: 26px; background: linear-gradient(90deg, #8b4513, #a0522d, #8b4513); border: 1px solid #5a2d0a; }
+
+        /* Menu Screen */
+        #menu { background: rgba(0,0,0,0.95); }
+        .menu-wrap { display: flex; width: 100%; height: 100%; }
+        .menu-tabs { width: 100px; background: #16213e; border-right: 3px solid #0f3460; padding: 15px 0; }
+        .tab { color: #888; font-size: 12px; padding: 12px 15px; cursor: pointer; border-left: 3px solid transparent; }
+        .tab:hover { color: #fff; background: rgba(255,255,255,0.05); }
+        .tab.active { color: #ffd700; border-left-color: #ffd700; background: rgba(255,215,0,0.1); }
+        .menu-body { flex: 1; padding: 15px; overflow-y: auto; }
+        .close-btn { position: absolute; top: 8px; right: 12px; background: none; border: none; color: #888; font-size: 20px; cursor: pointer; }
+        .close-btn:hover { color: #fff; }
+
+        /* Stats Panel */
+        .member-card { background: #16213e; border: 2px solid #0f3460; padding: 12px; margin-bottom: 12px; display: flex; gap: 15px; }
+        .member-name { color: #ffd700; font-size: 14px; }
+        .member-info { color: #87ceeb; font-size: 10px; margin: 3px 0 8px; }
+        .bars { display: flex; gap: 10px; margin-bottom: 8px; }
+        .bar { flex: 1; }
+        .bar-label { color: #888; font-size: 9px; margin-bottom: 2px; }
+        .bar-fill { height: 10px; background: #0a0a1a; border: 1px solid #333; position: relative; }
+        .bar-inner { height: 100%; }
+        .hp-bar .bar-inner { background: linear-gradient(90deg, #dc2626, #ef4444); }
+        .mp-bar .bar-inner { background: linear-gradient(90deg, #2563eb, #3b82f6); }
+        .bar-text { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); color: #fff; font-size: 8px; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; }
+        .stat-row { display: flex; align-items: center; gap: 5px; }
+        .stat-name { color: #888; font-size: 9px; width: 30px; }
+        .stat-bar { flex: 1; height: 6px; background: #0a0a1a; }
+        .stat-val { color: #fff; font-size: 9px; width: 25px; text-align: right; }
+        .str .stat-bar { background: linear-gradient(90deg, #ff6b6b var(--w), #0a0a1a var(--w)); }
+        .agi .stat-bar { background: linear-gradient(90deg, #4ecdc4 var(--w), #0a0a1a var(--w)); }
+        .mag .stat-bar { background: linear-gradient(90deg, #a855f7 var(--w), #0a0a1a var(--w)); }
+        .def .stat-bar { background: linear-gradient(90deg, #fbbf24 var(--w), #0a0a1a var(--w)); }
+        .con .stat-bar { background: linear-gradient(90deg, #22c55e var(--w), #0a0a1a var(--w)); }
+
+        /* Inventory */
+        .inv-section { background: #16213e; border: 2px solid #0f3460; padding: 10px; margin-bottom: 10px; }
+        .inv-title { color: #ffd700; font-size: 12px; margin-bottom: 8px; border-bottom: 1px solid #0f3460; padding-bottom: 5px; }
+        .inv-grid { display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px; }
+        .slot { width: 32px; height: 32px; background: #0a0a1a; border: 2px solid #333; display: flex; justify-content: center; align-items: center; }
+
+        /* Journal */
+        .quest { background: #16213e; border: 2px solid #0f3460; padding: 12px; margin-bottom: 10px; }
+        .quest-title { color: #ffd700; font-size: 12px; }
+        .quest-status { display: inline-block; padding: 2px 6px; font-size: 9px; margin-left: 8px; }
+        .quest-active { background: #fbbf24; color: #000; }
+        .quest-complete { background: #22c55e; color: #000; }
+        .quest-text { color: #fff; font-size: 11px; margin-top: 8px; line-height: 1.5; }
+
+        /* Reward Screen */
+        #reward { background: rgba(0,0,0,0.95); justify-content: center; align-items: center; text-align: center; }
+        .reward-title { color: #ffd700; font-size: 24px; margin-bottom: 15px; }
+        .reward-text { color: #fff; font-size: 12px; max-width: 400px; margin-bottom: 20px; }
+        .reward-items { display: flex; gap: 15px; justify-content: center; margin-bottom: 25px; }
+        .reward-item { background: #16213e; border: 2px solid #ffd700; padding: 10px 15px; display: flex; align-items: center; gap: 10px; }
+        .reward-item span { color: #fff; font-size: 11px; }
+
+        /* Overworld */
+        #overworld { background: linear-gradient(180deg, #87ceeb 0%, #87ceeb 30%, #3d7a37 30%, #2d5a27 100%); }
+        .ow-content { flex: 1; position: relative; }
+        .ow-town { position: absolute; bottom: 80px; left: 50%; transform: translateX(-50%); cursor: pointer; text-align: center; }
+        .ow-town span { color: #fff; font-size: 10px; text-shadow: 1px 1px #000; }
+        .ow-info { height: 70px; background: #16213e; border-top: 3px solid #0f3460; padding: 10px 15px; color: #fff; font-size: 11px; }
+
+        /* Modal */
+        .modal { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .modal.show { display: flex; }
+        .modal-box { background: #16213e; border: 4px solid #ffd700; padding: 25px; text-align: center; }
+        .modal-title { color: #ffd700; font-size: 16px; margin-bottom: 15px; }
+    </style>
+</head>
+<body>
+<div id="game">
+    <!-- Title Screen -->
+    <div id="title" class="screen active">
+        <div class="logo">RUNESTONE</div>
+        <div class="logo" style="font-size:24px;margin-top:-5px">CHRONICLES</div>
+        <div class="subtitle">A Journey Through Worlds</div>
+        <div class="menu-item sel" onclick="newGame()">NEW GAME</div>
+        <div class="menu-item" onclick="alert('Inspired by Final Fantasy Legend II')">CREDITS</div>
+    </div>
+
+    <!-- Character Creation -->
+    <div id="creation" class="screen">
+        <div id="step1" class="step active">
+            <div class="step-title">Choose Your Race</div>
+            <div class="grid" id="race-grid"></div>
+            <div class="btns">
+                <button class="btn" onclick="toTitle()">Back</button>
+                <button class="btn" id="btn-race" onclick="nextStep()" disabled>Next</button>
+            </div>
+        </div>
+        <div id="step2" class="step">
+            <div class="step-title">Choose Your Class</div>
+            <div class="grid" id="class-grid"></div>
+            <div class="btns">
+                <button class="btn" onclick="prevStep()">Back</button>
+                <button class="btn" id="btn-class" onclick="nextStep()" disabled>Next</button>
+            </div>
+        </div>
+        <div id="step3" class="step">
+            <div class="step-title">Name Your Hero</div>
+            <div id="preview" class="sprite"></div>
+            <input type="text" class="name" id="hero-name" maxlength="8" placeholder="NAME" oninput="checkName()">
+            <div style="color:#888;font-size:10px;margin-top:5px">Max 8 characters</div>
+            <div class="btns">
+                <button class="btn" onclick="prevStep()">Back</button>
+                <button class="btn" id="btn-name" onclick="beginGame()" disabled>Begin</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Town Screen -->
+    <div id="town" class="screen">
+        <div class="town-map" id="town-map"></div>
+        <div class="info-panel">
+            <div class="info-title">Harmony Village</div>
+            <div class="info-text" id="town-text">Welcome to Harmony Village.</div>
+            <div class="info-hint">[M] Menu | Click buildings to enter</div>
+        </div>
+    </div>
+
+    <!-- Building Interior -->
+    <div id="interior" class="screen">
+        <button class="btn back-btn" onclick="exitBuilding()">Exit</button>
+        <div class="int-content" id="int-content"></div>
+        <div class="dialog">
+            <div class="dialog-speaker" id="speaker">???</div>
+            <div class="dialog-text" id="dialog-text">...</div>
+            <div class="dialog-hint">[Enter] continue</div>
+        </div>
+    </div>
+
+    <!-- Menu Screen -->
+    <div id="menu" class="screen">
+        <button class="close-btn" onclick="closeMenu()">X</button>
+        <div class="menu-wrap">
+            <div class="menu-tabs">
+                <div class="tab active" data-tab="stats" onclick="menuTab('stats')">STATS</div>
+                <div class="tab" data-tab="items" onclick="menuTab('items')">ITEMS</div>
+                <div class="tab" data-tab="journal" onclick="menuTab('journal')">JOURNAL</div>
+            </div>
+            <div class="menu-body" id="menu-body"></div>
+        </div>
+    </div>
+
+    <!-- Reward Screen -->
+    <div id="reward" class="screen">
+        <div>
+            <div class="reward-title">Quest Complete!</div>
+            <div class="reward-text">Master Kai has blessed your party with equipment for the journey ahead.</div>
+            <div class="reward-items" id="reward-items"></div>
+            <button class="btn" onclick="closeReward()">Continue</button>
+        </div>
+    </div>
+
+    <!-- Overworld -->
+    <div id="overworld" class="screen">
+        <button class="btn back-btn" onclick="enterTown()">Return</button>
+        <div class="ow-content">
+            <div class="ow-town" onclick="enterTown()">
+                <div id="ow-sprite" class="sprite"></div>
+                <span>Harmony Village</span>
+            </div>
+        </div>
+        <div class="ow-info">
+            <div style="color:#ffd700;margin-bottom:5px">THE OVERWORLD</div>
+            <div>Your journey begins here. The path to the Runestones awaits...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Recruit Modal -->
+<div id="modal" class="modal">
+    <div class="modal-box">
+        <div class="modal-title">Name Your New Ally</div>
+        <div id="modal-sprite" class="sprite" style="margin:0 auto"></div>
+        <div id="modal-info" style="color:#87ceeb;font-size:11px;margin:8px 0"></div>
+        <input type="text" class="name" id="recruit-name" maxlength="8" placeholder="NAME">
+        <div class="btns" style="justify-content:center">
+            <button class="btn" onclick="cancelRecruit()">Cancel</button>
+            <button class="btn" onclick="confirmRecruit()">Recruit</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ========== SPRITE DATA ==========
+const SPRITES = {
+    human_warrior: [
+        'TTTTTT4444TTTTTT','TTTT44FFFF44TTTT','TTT4FFFFFFFF4TTT','TTT4FFAAFFAA4TTT',
+        'TTT4FFFFFFFF4TTT','TTTTFFFAAFFF4TTT','TTTTTT4444TTTTTT','TTTT44888844TTTT',
+        'TTT4488888844TTT','TTT4488FF8844TTT','TTT4448888444TTT','TTTT44888844TTTT',
+        'TTTT44444444TTTT','TTT444TTTT444TTT','TTT44TTTTTT44TTT','TT444TTTTTT444TT'
+    ],
+    human_mage: [
+        'TTTTTT9999TTTTTT','TTTT99AAAA99TTTT','TTT9AAAAAAAA9TTT','TTT9FFAAFFAA9TTT',
+        'TTT9FFFFFFFF9TTT','TTTTFFFAAFFF9TTT','TTTTTT9999TTTTTT','TTTT55555555TTTT',
+        'TTT5555555555TTT','TTT5555FF5555TTT','TTT5555555555TTT','TTTT55555555TTTT',
+        'TTTT55555555TTTT','TTT555TTTT555TTT','TTT55TTTTTT55TTT','TT555TTTTTT555TT'
+    ],
+    human_defender: [
+        'TTTTTT8888TTTTTT','TTTT88FFFF88TTTT','TTT8FFFFFFFF8TTT','TTT8FFAAFFAA8TTT',
+        'TTT8FFFFFFFF8TTT','TTTTFFFAAFFF8TTT','TTTTTT8888TTTTTT','TTT888888888TTT',
+        'TT88888888888TTT','TT888888888888TT','T8888888888888TT','T88888FF888888TT',
+        'TT888888888888TT','TTT888TT888TTTT','TTT88TTTT88TTTT','TT888TTTT888TTT'
+    ],
+    human_healer: [
+        'TTTTTTFFFFTTTTTT','TTTTFFFFFFFTTTTT','TTTFFFFFFFFFFTTT','TTTFFAAFFAAFFTTT',
+        'TTTFFFFFFFFFFTTT','TTTTFFFAAFFFFFTT','TTTTTTFFFFTTTTT','TTTTEEEEEEEETTT',
+        'TTTEEEEEEEEEETTT','TTTEEEFFFEEETTT','TTTEEEFFFFFEETTT','TTTTEEEFFFEETTTT',
+        'TTTTEEEEEEEETTTT','TTTEEETTTEEETTT','TTTEETTTTTEETTT','TTEEETTTTTEEETT'
+    ],
+    human_freelancer: [
+        'TTTTTT7777TTTTTT','TTTT77FFFF77TTTT','TTT7FFFFFFFF7TTT','TTT7FFAAFFAA7TTT',
+        'TTT7FFFFFFFF7TTT','TTTTFFFAAFFF7TTT','TTTTTT7777TTTTTT','TTTT66666666TTTT',
+        'TTT6666666666TTT','TTT6666FF6666TTT','TTT6666666666TTT','TTTT66666666TTTT',
+        'TTTT66666666TTTT','TTT666TTTT666TTT','TTT66TTTTTT66TTT','TT666TTTTTT666TT'
+    ],
+    esper: [
+        'TTTTTTAAAATTTTTT','TTTTAADDDDAATTTT','TTTADDDDDDDDATTT','TTTADDAADDAADTTT',
+        'TTTADDDDDDDDATTT','TTTTDDDAADDDDTTT','TTTTTTDDDDTTTTTT','TTTAAAAAAAAATTTT',
+        'TTAAAAAAAAAAAATT','TTAAAA99AAAAAT','TTAAA9999AAAATT','TTTAAA99AAAATTT',
+        'TTTAAAAAAAAAATTT','TTAAATTTTTAAATTT','TTAATTTTTTTTAATT','TAAATTTTTTTAAATT'
+    ],
+    cyborg: [
+        'TTTTTT8888TTTTTT','TTTT88888888TTTT','TTT8888888888TTT','TTT888FF88FF8TTT',
+        'TTT8888888888TTT','TTTT88888888TTTT','TTTTTT8888TTTTTT','TTT7777777777TTT',
+        'TT777777777777TT','TT7777AAAA7777TT','T77777AAAA77777T','T7777777777777TT',
+        'TT777777777777TT','TTT777TT777TTTT','TTT77TTTT77TTTT','TT777TTTT777TTT'
+    ],
+    fae_slime: [
+        'TTTTTTTTTTTTTTTT','TTTTTT3333TTTTTT','TTTT33333333TTTT','TTT3333333333TTT',
+        'TT333322223333TT','TT333322223333TT','T33333333333333T','T33333333333333T',
+        '3333333333333333','3333333333333333','3333333333333333','T33333333333333T',
+        'T33333333333333T','TT333333333333TT','TTT3333333333TTT','TTTTTTTTTTTTTTTT'
+    ],
+    fae_wolf: [
+        'TT888TTTTTT888TT','T88888TTTT88888T','T888888888888888','T888FFFFFF8888TT',
+        '8888FFFFFFFF888T','888FFFFFFFFFF88T','888FF22FF22FF88T','888FFFFFFFFFF88T',
+        'T888FFFFFFF888TT','T8888888888888TT','TT88888888888TTT','TTT888888888TTTT',
+        'TTT8888888888TTT','TT88888888888TTT','TT888TT888T888TT','TT88TTT88TT88TTT'
+    ],
+    fae_dino: [
+        'TTTTTT5555TTTTTT','TTTTT555555TTTTT','TTTT55555555TTTT','TTT5555225555TTT',
+        'TTT5555555555TTT','TTTT55555555TTTT','TTTTT555555TTTTT','TTTTT5555555TTTT',
+        'TTTT555555555TTT','TTT55555555555TT','TT5555555555555T','T555555555555555',
+        'T55555555555555T','TT555TTT555T555T','TTT55TTT55TT55TT','TTT55TTT55TT55TT'
+    ],
+    fae_goblin: [
+        'TTTTTT3333TTTTTT','TTTT33AAAA33TTTT','T333AAAAAAAA333T','T33AAAFFAAFF33TT',
+        'TT33AAAAAAAA33TT','TTT33AAFFAA33TTT','TTTTTTAAAATTTTTT','TTTT55555555TTTT',
+        'TTT5555555555TTT','TTT5555FF55555TT','TT555555555555TT','TTT5555555555TTT',
+        'TTT5555555555TTT','TTT555TTTT555TTT','TTT55TTTTTT55TTT','TT555TTTTTT555TT'
+    ],
+    short_sword: [
+        'TTTTTTTTTTTTTT88','TTTTTTTTTTTTT888','TTTTTTTTTTTT888T','TTTTTTTTTTT888TT',
+        'TTTTTTTTTT888TTT','TTTTTTTTT888TTTT','TTTTTTTT888TTTTT','TTTTTTT888TTTTTT',
+        'TTTTTT888TTTTTTT','TTTTT888TTTTTTTT','TTTT888TTTTTTTTT','TTT888TTTTTTTTTT',
+        'TT4884TTTTTTTTT','TT4444TTTTTTTTTT','TTT44TTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    staff: [
+        'TTTTTTTTTTTTTTTT','TTTTTTT99TTTTTTT','TTTTTT9AA9TTTTTT','TTTTTT9AA9TTTTTT',
+        'TTTTTTT99TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT',
+        'TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT',
+        'TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTT55TTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    wand: [
+        'TTTTTTTTTTTTF9FT','TTTTTTTTTTT9FF9T','TTTTTTTTTTF9F9TT','TTTTTTTTT9F99TTT',
+        'TTTTTTTT559TTTTT','TTTTTTT55TTTTTT','TTTTTT55TTTTTTT','TTTTT55TTTTTTTT',
+        'TTTT55TTTTTTTTT','TTT55TTTTTTTTTT','TT55TTTTTTTTTTT','T55TTTTTTTTTTTT',
+        'T5TTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    tome: [
+        'TTTTTTTTTTTTTTTT','TT555555555555TT','T5AAAAAAAAAAA55T','T5A99999999AA55T',
+        'T5A9FFFFFF9AA55T','T5A9FFFFFF9AA55T','T5A9FF99FF9AA55T','T5A9FFFFFF9AA55T',
+        'T5A9FFFFFF9AA55T','T5A99999999AA55T','T5AAAAAAAAAAA55T','T5AAAAAAAAAAA55T',
+        'T5555555555555TT','TT555555555555TT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    crossbow: [
+        'TTTTTTTTTTTTTTTT','TTTT5555555TTTTT','TTT55TTTTT55TTTT','TT55TTTTTTT55TTT',
+        'T55TTTTTTTTT55TT','T5TTTTT888TT5TTT','T5TTT88888885TTT','T5T888888888888T',
+        'T5TTT88888885TTT','T5TTTTT888TT5TTT','T55TTTTTTTTT55TT','TT55TTTTTTT55TTT',
+        'TTT55TTTTT55TTTT','TTTT5555555TTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    knife: [
+        'TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTT88TT','TTTTTTTTTTT888TT',
+        'TTTTTTTTTT888TTT','TTTTTTTTT888TTTT','TTTTTTTT888TTTTT','TTTTTTT888TTTTTT',
+        'TTTTTT888TTTTTTT','TTTTT888TTTTTTTT','TTTT5585TTTTTTTT','TTT555TTTTTTTTT',
+        'TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    cloth_armor: [
+        'TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT','TTTT66666666TTTT','TTT6666666666TTT',
+        'TTT6666666666TTT','TT666666666666TT','TT666666666666TT','TT666666666666TT',
+        'TT666666666666TT','TTT6666666666TTT','TTT6666666666TTT','TTTT66666666TTTT',
+        'TTTT66TTTT66TTTT','TTTT66TTTT66TTTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ],
+    dojo_unity: [
+        'TTTTT888888TTTTT','TTTT88888888TTTT','TTT8888FF8888TTT','TT888888888888TT',
+        'T88888888888888T','8888888888888888','5555555555555555','5555555555555555',
+        '555FFFF55FFFF555','555F88F55F88F555','555F88F55F88F555','555FFFF55FFFF555',
+        '5555555FF5555555','5555555FF5555555','5555555555555555','5555555555555555'
+    ],
+    dojo_warrior: [
+        'TTTTT444444TTTTT','TTTT44444444TTTT','TTT4444FF4444TTT','TT444444444444TT',
+        'T44444444444444T','4444444444444444','5555555555555555','5544555555554455',
+        '5544555555554455','555FFFF55FFFF555','555F44F55F44F555','555FFFF55FFFF555',
+        '5555555FF5555555','5555555FF5555555','5555555555555555','5555555555555555'
+    ],
+    dojo_mage: [
+        'TTTTT999999TTTTT','TTTT99999999TTTT','TTT9999AA9999TTT','TT999999999999TT',
+        'T99999999999999T','9999999999999999','5555555555555555','5599555555559955',
+        '5599555555559955','555FFFF55FFFF555','555F99F55F99F555','555FFFF55FFFF555',
+        '5555555FF5555555','5555555FF5555555','5555555555555555','5555555555555555'
+    ],
+    dojo_defender: [
+        'TTTTT888888TTTTT','TTTT88888888TTTT','TTT8888668888TTT','TT888888888888TT',
+        'T88888888888888T','8888888888888888','6666666666666666','6688666666668866',
+        '6688666666668866','666FFFF66FFFF666','666F88F66F88F666','666FFFF66FFFF666',
+        '6666666FF6666666','6666666FF6666666','6666666666666666','6666666666666666'
+    ],
+    dojo_healer: [
+        'TTTTTFFFFFFTTTTT','TTTTFFFFFFFFTTTT','TTTFFFFFF4FFFTT','TTFFFFFFFFFFF TT',
+        'TFFFFFFFFFFFFF T','FFFFFFFFFFFFFFFF','EEEEEEEEEEEEEEEE','EEFFEEEEEEEEFFE',
+        'EEFFEEEEEEEEFFEE','EEEFFFF44FFFFEEE','EEEF44F44F44FEEE','EEEFFFF44FFFFEEE',
+        'EEEEEEEFFFEEEEE','EEEEEEEFFFEEEEE','EEEEEEEEEEEEEEEE','EEEEEEEEEEEEEEEE'
+    ],
+    school: [
+        'TTTTTAAAAAATTTTT','TTTTAAAAAAAATTTT','TTTAAAA55AAAATTT','TTAAAAAAAAAAAATT',
+        'TAAAAAAAAAAAAAAT','AAAAAAAAAAAAAAAA','5555555555555555','5555555555555555',
+        '555FFFF55FFFF555','555F55F55F55F555','555F55F55F55F555','555FFFF55FFFF555',
+        '5555555FF5555555','5555555FF5555555','5555555555555555','5555555555555555'
+    ],
+    master: [
+        'TTTTTTFFFFTTTTT','TTTTFFFFFFFTTTTT','TTTFFFFFFFFFFTTT','TTTFFEAFFAEFFTTT',
+        'TTTFFFFFFFFFFTTT','TTTTFFFAAFFFTTT','TTTTTFFFFFFFFTTT','TTTT99999999TTTT',
+        'TTT9999999999TTT','TTT999FFFF999TTT','TTT9999999999TTT','TTTT99999999TTTT',
+        'TTTT99999999TTTT','TTT999TTTT999TTT','TTT99TTTTTT99TTT','TT999TTTTTT999TT'
+    ],
+    tree: [
+        'TTTTTT3333TTTTTT','TTTT33333333TTTT','TTT3333333333TTT','TT333333333333TT',
+        'T33333333333333T','T33333333333333T','3333333333333333','3333333333333333',
+        'T33333333333333T','TT333333333333TT','TTT3333333333TTT','TTTTTT5555TTTTTT',
+        'TTTTTT5555TTTTTT','TTTTTT5555TTTTTT','TTTTTT5555TTTTTT','TTTTTT5555TTTTTT'
+    ],
+    fountain: [
+        'TTTTTT9999TTTTTT','TTTTT999999TTTTT','TTTT99BBBB99TTTT','TTTT9BBBBBB9TTTT',
+        'TTTT9BBBBBB9TTTT','TTTT99BBBB99TTTT','TTT8888888888TTT','TT888888888888TT',
+        'TT888BBBBBB888TT','TT88BBBBBBBB88TT','TT88BBBBBBBB88TT','TT888BBBBBB888TT',
+        'TT888888888888TT','TTT8888888888TTT','TTTTTTTTTTTTTTTT','TTTTTTTTTTTTTTTT'
+    ]
+};
+
+const COLORS = {
+    '0':'#000','1':'#1a1a2e','2':'#2d5a27','3':'#3d7a37','4':'#cc4444','5':'#8b7355',
+    '6':'#6b5344','7':'#777','8':'#888','9':'#a855f7','A':'#ffddaa','B':'#4488ff',
+    'C':'#44cc44','D':'#ddddff','E':'#eeeeff','F':'#fff','T':'transparent'
+};
+
+// ========== GAME DATA ==========
+const RACES = {
+    human: { name:'Human', desc:'Balanced. Any class.', classes:['warrior','mage','defender','healer','freelancer'], stats:{str:10,agi:10,mag:10,def:10,con:10} },
+    esper: { name:'Esper', desc:'Magical. Mage only.', classes:['mage'], stats:{str:8,agi:15,mag:25,def:8,con:8} },
+    cyborg: { name:'Cyborg', desc:'Gear-based.', classes:['warrior','mage','defender','healer'], stats:{str:5,agi:5,mag:5,def:5,con:5} },
+    fae: { name:'Fae', desc:'Shape-shifter.', classes:['warrior','mage','defender','healer'], stats:{str:5,agi:5,mag:5,def:5,con:5} }
+};
+
+const CLASSES = {
+    warrior: { name:'Warrior', desc:'High STR damage.', bonus:{str:20} },
+    mage: { name:'Mage', desc:'High MAG damage.', bonus:{mag:20} },
+    defender: { name:'Defender', desc:'Tank. High DEF.', bonus:{def:20,con:20} },
+    healer: { name:'Healer', desc:'Support magic.', bonus:{mag:20,agi:15} },
+    freelancer: { name:'Freelancer', desc:'Jack of all trades.', bonus:{str:12,agi:12,mag:12,def:12,con:12} }
+};
+
+const BUILDINGS = {
+    unity: { name:'Temple of Unity', type:'dojo', classes:['warrior','mage','defender','healer','freelancer'], x:270, y:30 },
+    warrior: { name:'Warrior Dojo', type:'dojo', classes:['warrior'], x:60, y:100 },
+    mage: { name:'Mage Tower', type:'dojo', classes:['mage'], x:480, y:100 },
+    defender: { name:'Defender Hall', type:'dojo', classes:['defender'], x:60, y:220 },
+    healer: { name:'Healer Sanctuary', type:'dojo', classes:['healer'], x:480, y:220 },
+    school: { name:'School House', type:'school', x:270, y:160 }
+};
+
+const DIALOGS = {
+    intro: [
+        "Welcome, young one. I am Master Kai.",
+        "I have been having prophetic dreams...",
+        "The fabric of reality is tearing across all worlds.",
+        "A faceless being showed me the path - gather the Runestones.",
+        "These artifacts open portals between worlds.",
+        "First, gather allies from the dojos in our village.",
+        "Recruit three warriors, then return to me.",
+        "Visit the Warrior Dojo, Mage Tower, Defender Hall, and Healer Sanctuary.",
+        "You may also recruit from here - we train all disciplines.",
+        "Go now. Choose your companions wisely."
+    ],
+    complete: [
+        "Excellent! Your party is assembled.",
+        "Take these gifts for your journey...",
+        "Cloth armor for protection...",
+        "...and a knife for desperate times.",
+        "The path out of the village leads to the Overworld.",
+        "Seek the first Runestone. Open the portal.",
+        "May the light guide you, young heroes."
+    ],
+    school: ["Welcome to the School House.", "Here you learn about the world.", "[Tutorial coming soon]"]
+};
+
+// ========== STATE ==========
+let G = { screen:'title', step:0, race:null, cls:null, party:[], quest:0, bldg:null, dlgIdx:0, dlgKey:null, dlgCb:null, inv:[], journal:[] };
+let pendingRecruit = null;
+
+// ========== RENDERING ==========
+function render(data, scale=4) {
+    const c = document.createElement('canvas');
+    c.width = c.height = 16*scale;
+    const ctx = c.getContext('2d');
+    for(let y=0; y<16; y++) {
+        const row = data[y]||'';
+        for(let x=0; x<16; x++) {
+            const k = row[x]||'T';
+            if(k!=='T') { ctx.fillStyle=COLORS[k]||'#f0f'; ctx.fillRect(x*scale,y*scale,scale,scale); }
+        }
+    }
+    return c.toDataURL();
+}
+
+function getSprite(race, cls) {
+    if(race==='esper') return SPRITES.esper;
+    if(race==='cyborg') return SPRITES.cyborg;
+    if(race==='fae') return SPRITES.fae_goblin;
+    return SPRITES['human_'+cls] || SPRITES.human_warrior;
+}
+
+function setSprite(el, data, scale=4) {
+    el.style.backgroundImage = `url('${render(data,scale)}')`;
+    el.style.backgroundSize = '100%';
+}
+
+// ========== SCREENS ==========
+function show(id) {
+    document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+    G.screen = id;
+}
+
+function toTitle() { show('title'); }
+
+function newGame() {
+    G = { screen:'creation', step:0, race:null, cls:null, party:[], quest:0, bldg:null, dlgIdx:0, dlgKey:null, dlgCb:null, inv:[], journal:[{title:'The Gathering',text:'Gather three allies from the dojos.',status:'active'}] };
+    initCreation();
+    show('creation');
+}
+
+// ========== CHARACTER CREATION ==========
+function initCreation() {
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    document.getElementById('step1').classList.add('active');
+
+    const grid = document.getElementById('race-grid');
+    grid.innerHTML = '';
+    Object.entries(RACES).forEach(([id,r])=>{
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = ()=>selectRace(id);
+        const sp = document.createElement('div');
+        sp.className = 'sprite';
+        setSprite(sp, getSprite(id,'warrior'));
+        card.appendChild(sp);
+        card.innerHTML += `<div class="card-name">${r.name}</div><div class="card-desc">${r.desc}</div>`;
+        grid.appendChild(card);
+    });
+}
+
+function selectRace(id) {
+    G.race = id; G.cls = null;
+    document.querySelectorAll('#race-grid .card').forEach((c,i)=>c.classList.toggle('sel',Object.keys(RACES)[i]===id));
+    document.getElementById('btn-race').disabled = false;
+}
+
+function selectClass(id) {
+    G.cls = id;
+    const allowed = RACES[G.race].classes;
+    document.querySelectorAll('#class-grid .card').forEach((c,i)=>c.classList.toggle('sel',allowed[i]===id));
+    document.getElementById('btn-class').disabled = false;
+}
+
+function nextStep() {
+    G.step++;
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    if(G.step===1) {
+        document.getElementById('step2').classList.add('active');
+        renderClasses();
+    } else if(G.step===2) {
+        document.getElementById('step3').classList.add('active');
+        setSprite(document.getElementById('preview'), getSprite(G.race,G.cls));
+    }
+}
+
+function prevStep() {
+    G.step--;
+    document.querySelectorAll('.step').forEach(s=>s.classList.remove('active'));
+    document.getElementById('step'+(G.step+1)).classList.add('active');
+}
+
+function renderClasses() {
+    const grid = document.getElementById('class-grid');
+    grid.innerHTML = '';
+    RACES[G.race].classes.forEach(id=>{
+        const cls = CLASSES[id];
+        const card = document.createElement('div');
+        card.className = 'card';
+        card.onclick = ()=>selectClass(id);
+        const sp = document.createElement('div');
+        sp.className = 'sprite';
+        setSprite(sp, getSprite(G.race,id));
+        card.appendChild(sp);
+        card.innerHTML += `<div class="card-name">${cls.name}</div><div class="card-desc">${cls.desc}</div>`;
+        grid.appendChild(card);
+    });
+    document.getElementById('btn-class').disabled = true;
+}
+
+function checkName() {
+    document.getElementById('btn-name').disabled = !document.getElementById('hero-name').value.trim();
+}
+
+function beginGame() {
+    const name = document.getElementById('hero-name').value.trim().toUpperCase();
+    const hero = makeChar(name, G.race, G.cls);
+    hero.isLeader = true;
+    G.party = [hero];
+    initTown();
+    show('town');
+}
+
+function makeChar(name, race, cls) {
+    const stats = {...RACES[race].stats};
+    if(CLASSES[cls].bonus) Object.entries(CLASSES[cls].bonus).forEach(([k,v])=>stats[k]=(stats[k]||0)+v);
+    return { name, race, class:cls, level:1, stats, hp:100+stats.con*5, maxHp:100+stats.con*5, mp:100+stats.mag*5, maxMp:100+stats.mag*5, equip:{weapon:null,armor:null} };
+}
+
+// ========== TOWN ==========
+function initTown() {
+    const map = document.getElementById('town-map');
+    map.innerHTML = '';
+
+    // Paths
+    const paths = [
+        {x:50,y:300,w:540,h:20,cls:'path-h'},
+        {x:98,y:160,w:20,h:140,cls:'path-v'},
+        {x:518,y:160,w:20,h:140,cls:'path-v'},
+        {x:308,y:100,w:20,h:200,cls:'path-v'},
+        {x:308,y:300,w:20,h:80,cls:'path-v'}
+    ];
+    paths.forEach(p=>{
+        const d = document.createElement('div');
+        d.className = 'path '+p.cls;
+        d.style.cssText = `left:${p.x}px;top:${p.y}px;width:${p.w}px;height:${p.h}px`;
+        map.appendChild(d);
+    });
+
+    // Trees
+    [[10,40],[590,40],[10,280],[590,280]].forEach(([x,y])=>{
+        const t = document.createElement('div');
+        t.className = 'sprite-sm';
+        t.style.cssText = `position:absolute;left:${x}px;top:${y}px`;
+        setSprite(t, SPRITES.tree, 2);
+        map.appendChild(t);
+    });
+
+    // Fountain
+    const f = document.createElement('div');
+    f.className = 'sprite-sm';
+    f.style.cssText = 'position:absolute;left:302px;top:270px';
+    setSprite(f, SPRITES.fountain, 2);
+    map.appendChild(f);
+
+    // Buildings
+    Object.entries(BUILDINGS).forEach(([id,b])=>{
+        const bld = document.createElement('div');
+        bld.className = 'building';
+        bld.style.cssText = `left:${b.x}px;top:${b.y}px`;
+        bld.onclick = ()=>enterBuilding(id);
+        const sp = document.createElement('div');
+        sp.style.cssText = 'width:96px;height:96px';
+        const spriteKey = b.type==='school' ? 'school' : 'dojo_'+(id==='unity'?'unity':b.classes[0]);
+        setSprite(sp, SPRITES[spriteKey], 6);
+        bld.appendChild(sp);
+        const lbl = document.createElement('div');
+        lbl.className = 'building-label';
+        lbl.textContent = b.name;
+        bld.appendChild(lbl);
+        map.appendChild(bld);
+    });
+
+    // Exit
+    const exit = document.createElement('div');
+    exit.className = 'exit-marker';
+    exit.textContent = 'EXIT';
+    exit.onclick = tryExit;
+    map.appendChild(exit);
+
+    updateTownText();
+}
+
+function updateTownText() {
+    const t = document.getElementById('town-text');
+    if(G.quest===0) t.textContent = 'Visit the Temple of Unity to speak with Master Kai.';
+    else if(G.quest===1) {
+        const need = 4-G.party.length;
+        t.textContent = need>0 ? `Recruit ${need} more warrior${need>1?'s':''}. Party: ${G.party.length}/4` : 'Return to the Temple of Unity.';
+    } else t.textContent = 'Your party is ready. Head to the exit.';
+}
+
+function tryExit() {
+    if(G.quest<3) { document.getElementById('town-text').textContent = 'Complete your task for Master Kai first.'; return; }
+    setSprite(document.getElementById('ow-sprite'), SPRITES.dojo_unity);
+    show('overworld');
+}
+
+function enterTown() { show('town'); }
+
+// ========== BUILDING INTERIOR ==========
+function enterBuilding(id) {
+    G.bldg = id;
+    const b = BUILDINGS[id];
+    show('interior');
+    const content = document.getElementById('int-content');
+    content.innerHTML = `<div class="int-header">${b.name}</div>`;
+
+    if(b.type==='dojo') {
+        if(id==='unity' && G.quest===0) { startDialog('intro',()=>{ G.quest=1; updateTownText(); renderNPCs(b); }); return; }
+        if(id==='unity' && G.quest===1 && G.party.length>=4) { startDialog('complete',()=>{ G.quest=2; giveRewards(); }); return; }
+        if(G.quest>=1) renderNPCs(b);
+        else setDialog('Villager','The master awaits at the Temple of Unity.');
+    } else {
+        content.innerHTML += '<div class="school-room"><div class="blackboard"><div style="color:#ffd700">LESSON 1: RUNESTONES</div>Ancient artifacts that power Portal Gates.</div>';
+        for(let i=0;i<8;i++) content.querySelector('.school-room').innerHTML += '<div class="desk" onclick="readBook()"><div class="book"></div></div>';
+        content.innerHTML += '</div>';
+        startDialog('school');
+    }
+}
+
+function renderNPCs(b) {
+    const content = document.getElementById('int-content');
+    const grid = document.createElement('div');
+    grid.className = 'npc-grid';
+
+    b.classes.forEach(cls=>{
+        Object.entries(RACES).filter(([id,r])=>r.classes.includes(cls)).forEach(([race])=>{
+            const npc = document.createElement('div');
+            npc.className = 'npc';
+            npc.onclick = ()=>startRecruit(race,cls);
+            const sp = document.createElement('div');
+            sp.className = 'sprite-sm';
+            sp.style.margin = '0 auto';
+            setSprite(sp, getSprite(race,cls), 2);
+            npc.appendChild(sp);
+            npc.innerHTML += `<div class="npc-name">${RACES[race].name}</div><div class="npc-class">${CLASSES[cls].name}</div>`;
+            grid.appendChild(npc);
+        });
+    });
+
+    content.appendChild(grid);
+    setDialog('', G.party.length>=4 ? 'Party full. Return to Master Kai.' : 'Choose a warrior to recruit.');
+}
+
+function readBook() { setDialog('Book','Ancient lore written in faded ink...'); }
+
+function exitBuilding() { G.bldg=null; show('town'); updateTownText(); }
+
+// ========== DIALOG ==========
+function startDialog(key, cb=null) {
+    G.dlgKey = key; G.dlgCb = cb; G.dlgIdx = 0;
+    showNextDialog();
+}
+
+function showNextDialog() {
+    const dlgs = DIALOGS[G.dlgKey];
+    if(!dlgs || G.dlgIdx>=dlgs.length) {
+        if(G.dlgCb) { G.dlgCb(); G.dlgCb=null; }
+        G.dlgKey = null;
+        return;
+    }
+    setDialog('Master Kai', dlgs[G.dlgIdx++]);
+}
+
+function setDialog(speaker, text) {
+    document.getElementById('speaker').textContent = speaker;
+    document.getElementById('dialog-text').textContent = text;
+}
+
+// ========== RECRUIT ==========
+function startRecruit(race, cls) {
+    if(G.party.length>=4) { setDialog('','Party full!'); return; }
+    pendingRecruit = {race, cls};
+    setSprite(document.getElementById('modal-sprite'), getSprite(race,cls));
+    document.getElementById('modal-info').textContent = `${RACES[race].name} ${CLASSES[cls].name}`;
+    document.getElementById('recruit-name').value = '';
+    document.getElementById('modal').classList.add('show');
+}
+
+function cancelRecruit() { pendingRecruit=null; document.getElementById('modal').classList.remove('show'); }
+
+function confirmRecruit() {
+    const name = document.getElementById('recruit-name').value.trim().toUpperCase();
+    if(!name) { alert('Enter a name!'); return; }
+    G.party.push(makeChar(name, pendingRecruit.race, pendingRecruit.cls));
+    pendingRecruit = null;
+    document.getElementById('modal').classList.remove('show');
+    setDialog('', `${name} joined! (${G.party.length}/4)`);
+    updateTownText();
+    if(G.bldg) enterBuilding(G.bldg);
+}
+
+// ========== REWARDS ==========
+function giveRewards() {
+    G.quest = 3;
+    G.party.forEach(m=>{ m.equip.weapon={name:'Knife',power:5}; m.equip.armor={name:'Cloth Armor',def:3}; });
+    G.inv = [{name:'Knife',qty:4,type:'weapon'},{name:'Cloth Armor',qty:4,type:'armor'}];
+    G.journal[0].status = 'complete';
+    G.journal.push({title:'Journey Begins',text:'Seek the Runestones in the Overworld.',status:'active'});
+
+    const items = document.getElementById('reward-items');
+    items.innerHTML = '';
+    [{sprite:SPRITES.cloth_armor,name:'Cloth Armor',qty:4},{sprite:SPRITES.knife,name:'Knife',qty:4}].forEach(i=>{
+        const div = document.createElement('div');
+        div.className = 'reward-item';
+        const sp = document.createElement('div');
+        sp.className = 'sprite-sm';
+        setSprite(sp, i.sprite, 2);
+        div.appendChild(sp);
+        div.innerHTML += `<span>${i.name} x${i.qty}</span>`;
+        items.appendChild(div);
+    });
+    show('reward');
+}
+
+function closeReward() { show('town'); updateTownText(); }
+
+// ========== MENU ==========
+function openMenu() { show('menu'); menuTab('stats'); }
+function closeMenu() { show(G.bldg?'interior':'town'); }
+
+function menuTab(tab) {
+    document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===tab));
+    const body = document.getElementById('menu-body');
+    body.innerHTML = '';
+
+    if(tab==='stats') {
+        G.party.forEach(m=>{
+            const card = document.createElement('div');
+            card.className = 'member-card';
+            const sp = document.createElement('div');
+            sp.className = 'sprite-sm';
+            setSprite(sp, getSprite(m.race,m.class), 2);
+
+            const hpPct = (m.hp/m.maxHp*100).toFixed(0);
+            const mpPct = (m.mp/m.maxMp*100).toFixed(0);
+
+            card.innerHTML = `
+                <div>${sp.outerHTML}</div>
+                <div style="flex:1">
+                    <div class="member-name">${m.name}${m.isLeader?' *':''}</div>
+                    <div class="member-info">Lv.${m.level} ${RACES[m.race].name} ${CLASSES[m.class].name}</div>
+                    <div class="bars">
+                        <div class="bar hp-bar"><div class="bar-label">HP</div><div class="bar-fill"><div class="bar-inner" style="width:${hpPct}%"></div><div class="bar-text">${m.hp}/${m.maxHp}</div></div></div>
+                        <div class="bar mp-bar"><div class="bar-label">MP</div><div class="bar-fill"><div class="bar-inner" style="width:${mpPct}%"></div><div class="bar-text">${m.mp}/${m.maxMp}</div></div></div>
+                    </div>
+                    <div class="stats-grid">
+                        ${['str','agi','mag','def','con'].map(s=>`<div class="stat-row ${s}"><div class="stat-name">${s.toUpperCase()}</div><div class="stat-bar" style="--w:${Math.min(m.stats[s]/50*100,100)}%"></div><div class="stat-val">${m.stats[s]}</div></div>`).join('')}
+                    </div>
+                </div>
+            `;
+            body.appendChild(card);
+        });
+    } else if(tab==='items') {
+        ['Weapons','Armor','Items'].forEach(cat=>{
+            const sec = document.createElement('div');
+            sec.className = 'inv-section';
+            sec.innerHTML = `<div class="inv-title">${cat}</div><div class="inv-grid">${'<div class="slot"></div>'.repeat(16)}</div>`;
+            body.appendChild(sec);
+        });
+    } else {
+        G.journal.forEach(q=>{
+            const div = document.createElement('div');
+            div.className = 'quest';
+            div.innerHTML = `<div class="quest-title">${q.title}<span class="quest-status quest-${q.status}">${q.status.toUpperCase()}</span></div><div class="quest-text">${q.text}</div>`;
+            body.appendChild(div);
+        });
+    }
+}
+
+// ========== KEYBOARD ==========
+document.addEventListener('keydown', e=>{
+    if(e.key==='m'||e.key==='M') { G.screen==='menu'?closeMenu():(['town','interior','overworld'].includes(G.screen)&&openMenu()); }
+    if(e.key==='Enter'&&G.dlgKey) showNextDialog();
+    if(e.key==='Escape') { if(G.screen==='menu')closeMenu(); else if(G.screen==='interior')exitBuilding(); }
+});
+</script>
+</body>
+</html>
