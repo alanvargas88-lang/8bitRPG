@@ -1,0 +1,26 @@
+{
+  "name": "8bitrpg",
+  "version": "0.1.0",
+  "description": "An 8-bit RPG game inspired by classic Game Boy Final Fantasy games",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": [
+    "rpg",
+    "8bit",
+    "game",
+    "turn-based"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  }
+}
